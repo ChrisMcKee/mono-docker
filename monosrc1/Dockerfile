@@ -8,7 +8,7 @@ ARG MONO_BUILD=/mono-build
 
 ### install mono-runtime
 WORKDIR /mono-src
-RUN apk add --no-cache build-base autoconf automake libtool cmake linux-headers zlib-dev python3 git gettext curl bash
+RUN apk add --no-cache build-base autoconf automake libtool cmake linux-headers zlib-dev python3 git gettext curl bash libgcc ca-certificates
 RUN ln -s /usr/bin/python3 /usr/bin/python; \
     git clone https://gitlab.winehq.org/mono/mono.git --branch mono-${MONO_VER} --depth 1 .
 RUN ./autogen.sh --disable-boehm \

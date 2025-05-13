@@ -1,6 +1,6 @@
 FROM debian:bookworm-slim
 
-ENV MONO_VERSION=6.12.0.182
+ENV MONO_VERSION=6.12
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends gnupg dirmngr ca-certificates \

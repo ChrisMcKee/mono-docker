@@ -4,7 +4,7 @@ FROM debian:bookworm-slim
 RUN \
     DEBIAN_FRONTEND=noninteractive apt update && \
     DEBIAN_FRONTEND=noninteractive apt upgrade -y && \
-    DEBIAN_FRONTEND=noninteractive apt install -y git autoconf libtool automake build-essential gettext cmake python3
+    DEBIAN_FRONTEND=noninteractive apt install -y git autoconf libtool automake build-essential gettext cmake python3 ca-certificates
 
 # Set installation prefix
 ENV PREFIX=/usr/local
@@ -18,6 +18,8 @@ ENV PATH=$PREFIX/bin:$PATH
 
 # Clone and build Mono
 RUN git clone --depth 1 https://gitlab.winehq.org/mono/mono.git && \
+    git checkout mono-6.14.1 && \
+    git submodule update --init --recursive && \
     cd mono && \
     ./autogen.sh --prefix=$PREFIX && \
     make && \
