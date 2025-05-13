@@ -1,0 +1,100 @@
+name: Docker
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+  release:
+    types:
+    # "released" excludes pre-releases
+    # "published" is either a release or a pre-release
+    - published
+  schedule:
+    - cron: '0 3 * * 1'
+
+jobs:
+  build-and-push:
+    strategy:
+      matrix:
+        variant: [default, slim]
+    env:
+      IMAGE_NAME: mono
+      MONO_VERSION: 6.12.0.206
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+      deployments: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+
+      - name: Get the version
+        id: get_version
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="v$(date +"%Y-%m-%d-%H%M")"
+          else
+            VERSION="$(echo $GITHUB_REF | cut -d / -f 3)"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Prepare Metadata for Docker Images
+        id: Metadata
+        uses: docker/metadata-action@v5
+        env:
+          DOCKER_METADATA_PR_HEAD_SHA: true
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+        with:
+          images: |
+            ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+            ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}:latest
+          flavor: |
+            suffix=-${{ matrix.os }}
+            latest=false
+          # Geodesic's original code is licensed under the Apache 2.0 License (Apache-2.0)
+          # but it contains many other components with different licenses.
+          labels: |
+            org.opencontainers.image.title=mono
+            org.opencontainers.image.description=Cross platform, open source .NET framework
+            org.opencontainers.image.vendor=chrismckee
+            org.opencontainers.image.licenses=NOASSERTION
+          annotations: |
+            org.opencontainers.image.authors=devops@ivendi.com
+            org.opencontainers.image.title=mono
+            org.opencontainers.image.description=Cross platform, open source .NET framework
+            org.opencontainers.image.vendor=chrismckee
+            org.opencontainers.image.licenses=NOASSERTION
+          tags: |
+            type=semver,pattern={{version}}
+            type=ref,event=pr,prefix=pr-,suffix=-debian
+            type=raw,value=latest,enable=${{ github.event_name == 'release' && github.event.action == 'published' }}
+            type=raw,value=latest,suffix=,enable=${{ github.event_name == 'release' && github.event.action == 'published' && matrix.os == env.LATEST_TAG_OS }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          cache-from: type=registry,ref=ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}:latest
+          cache-to: type=inline
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}${{ matrix.variant == 'slim' && '-slim' || '' }}
+            ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}:latest${{ matrix.variant == 'slim' && '-slim' || '' }}
+          labels: ${{ steps.Metadata.outputs.labels }}
+          file: ${{ matrix.variant == 'slim' && format('{0}/slim/Dockerfile', env.MONO_VERSION) || format('{0}/Dockerfile', env.MONO_VERSION) }}
+          build-args: |
+            VERSION=$VERSION
+          push: true
