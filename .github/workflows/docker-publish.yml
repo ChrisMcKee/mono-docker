@@ -41,6 +41,9 @@ jobs:
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login docker.io -u "${{ secrets.DOCKER_USER }}" --password-stdin
+
       - name: Get the version
         id: get_version
         run: |
@@ -93,6 +96,8 @@ jobs:
           tags: |
             ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}${{ matrix.variant == 'slim' && '-slim' || '' }}
             ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}:latest${{ matrix.variant == 'slim' && '-slim' || '' }}
+            docker.io/chrismckee/mono:${{ env.VERSION }}${{ matrix.variant == 'slim' && '-slim' || '' }}
+            docker.io/chrismckee/mono:latest${{ matrix.variant == 'slim' && '-slim' || '' }}
           labels: ${{ steps.Metadata.outputs.labels }}
           file: ${{ matrix.variant == 'slim' && format('{0}/slim/Dockerfile', env.MONO_VERSION) || format('{0}/Dockerfile', env.MONO_VERSION) }}
           build-args: |
